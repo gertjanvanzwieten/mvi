@@ -4,6 +4,13 @@ import os, sys, tempfile, itertools
 
 
 def proceed( *options ):
+  '''Wait for keyboard input to select option, return index.
+
+  Options can be specifide by either the first character or the full word. No
+  checks are performed to confirm that all options have a uniquely identifying
+  first character.
+  '''
+
   while True:
     answer = input( 'proceed {}? '.format('/'.join(options)) )
     for i, option in enumerate(options):
@@ -12,6 +19,14 @@ def proceed( *options ):
 
 
 def getrenames( init={} ):
+  '''Invoke editor to create a rename dictionary.
+
+  A temporary file is created with the alphabetically ordered file and
+  directory listing of the current working directory, and opened with the
+  default system editor. At exit the list is checked for errors and returned as
+  an old->new dictionary limited to changes.
+  '''
+
   oldnames = sorted( os.listdir() )
   editor = os.environ.get( 'EDITOR', 'vim' )
   fd, tmp = tempfile.mkstemp()
@@ -40,6 +55,15 @@ def getrenames( init={} ):
 
 
 def poprename( renames ):
+  '''Pop a dictionary item and perform the rename operation.
+
+  The first rename operation is performed that has a free destination path. If
+  renames occur in a "a->b->..->a" cycle then a temporary path is introduced
+  and added to the dictionary of renames. The rename item is popped only after
+  the move operation is succesfully completed to ensure that the dictionary
+  remains in sync with the on-disk state at all times.
+  '''
+
   for name in renames:
     break
   try:
@@ -63,6 +87,14 @@ def poprename( renames ):
 
 
 def main():
+  '''Coordinate aqcuisition and execution of renames.
+
+  Call getrenames to obtain text editor input and feed the resuling renames
+  dictionary into poprename until empty. In case of errors, repeat the above,
+  while feeding the leftover renames back into getrenames to ensure that edits
+  are not lost.
+  '''
+
   if len(sys.argv) != 1:
     sys.exit( 'usage: {}'.format(sys.argv[0]) )
   renames = getrenames()

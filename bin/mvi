@@ -1,0 +1,81 @@
+#! /usr/bin/env python3
+
+import os, sys, tempfile, itertools
+
+
+def proceed( *options ):
+  while True:
+    answer = input( 'proceed {}? '.format('/'.join(options)) )
+    for i, option in enumerate(options):
+      if answer in ( option, option[0] ):
+        return i
+
+
+def getrenames( init={} ):
+  oldnames = sorted( os.listdir() )
+  editor = os.environ.get( 'EDITOR', 'vim' )
+  fd, tmp = tempfile.mkstemp()
+  try:
+    os.fdopen( fd, 'w' ).write( '\n'.join( init.get(name,name) for name in oldnames ) )
+    while True:
+      if os.system( editor + ' ' + tmp ) != 0:
+        print( 'editor returned with non-zero status' )
+      with open( tmp, 'r' ) as fid:
+        newnames = fid.read().splitlines()
+      for i, (old,new) in enumerate( itertools.zip_longest( oldnames, newnames, fillvalue='?' ) ):
+        if old != new:
+          print( 'line {}: {} -> {}'.format( i+1, old, new ) )
+      if len(newnames) != len(oldnames):
+        print( 'error: invalid length' )
+      elif len(set(newnames)) < len(newnames):
+        print( 'error: duplicate names' )
+      elif not all(newnames):
+        print( 'error: empty filenames' )
+      elif oldnames == newnames or proceed( 'yes', 'no' ) == 0:
+        return { old: new for old, new in zip( oldnames, newnames ) if old != new }
+      if proceed( 'edit', 'quit' ) == 1:
+        sys.exit( 'aborted.' )
+  finally:
+    os.remove( tmp )
+
+
+def poprename( renames ):
+  for name in renames:
+    break
+  try:
+    cycle = [name]
+    while os.path.exists( renames[name] ):
+      name = renames[name]
+      assert name in renames, 'target exists'
+      if name != cycle[0]:
+        cycle.append( name )
+      else:
+        print( 'cycle detected:', ' '.join(cycle) )
+        temp = name
+        while os.path.exists(temp):
+          temp += '_'
+        renames.update({ name: temp, temp: renames[name] })
+    os.renames( name, renames[name] )
+  except Exception as e:
+    raise Exception( 'failed to rename {} to {}: {}'.format( name, renames.get(name,'???'), e ) )
+  else:
+    print( 'renamed', name, 'to', renames.pop(name) )
+
+
+def main():
+  if len(sys.argv) != 1:
+    sys.exit( 'usage: {}'.format(sys.argv[0]) )
+  renames = getrenames()
+  while renames:
+    try:
+      poprename( renames )
+    except Exception as e:
+      print( 'error:', e )
+      if proceed( 'edit', 'quit' ) == 1:
+        sys.exit( 'aborted.' )
+      renames = getrenames( init=renames )
+  print( 'nothing left to rename.' )
+
+
+if __name__ == '__main__':
+  main()

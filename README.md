@@ -49,9 +49,9 @@ Swapping lines results in swapping files:
     line 2: foo -> bar
     proceed yes/no? y
     cycle detected: foo bar
-    renamed foo to foo_
+    renamed foo to bar_
     renamed bar to foo
-    renamed foo_ to bar
+    renamed bar_ to bar
     nothing left to rename.
 
     $ ls
@@ -77,7 +77,7 @@ absolute) destination path including directory separators.
 ## installation
 
 Mvi does not have any dependencies other than Python3 and can be run directly
-from the /bin directory. Alternatively it can be installed system wide using
+as `python3 mvi.py`. Alternatively it can be installed system wide using
 Python's setuptools:
 
     python3 setup.py install

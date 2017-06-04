@@ -3,111 +3,122 @@
 import os, sys, tempfile, itertools
 
 
-def proceed( *options ):
+def proceed(*options):
   '''Wait for keyboard input to select option, return index.
 
   Options can be specifide by either the first character or the full word. No
   checks are performed to confirm that all options have a uniquely identifying
-  first character.
-  '''
+  first character.'''
 
   while True:
-    answer = input( 'proceed {}? '.format('/'.join(options)) )
+    answer = input('proceed {}? '.format('/'.join(options)))
     for i, option in enumerate(options):
-      if answer in ( option, option[0] ):
+      if answer in (option, option[0]):
         return i
 
 
-def getrenames( init={} ):
+def getrenames(init={}):
   '''Invoke editor to create a rename dictionary.
 
   A temporary file is created with the alphabetically ordered file and
   directory listing of the current working directory, and opened with the
   default system editor. At exit the list is checked for errors and returned as
-  an old->new dictionary limited to changes.
-  '''
+  an old->new dictionary limited to changes.'''
 
-  oldnames = sorted( os.listdir() )
-  editor = os.environ.get( 'EDITOR', 'vim' )
+  oldnames = sorted(os.listdir())
+  editor = os.environ.get('EDITOR', 'vim')
   fd, tmp = tempfile.mkstemp()
   try:
-    os.fdopen( fd, 'w' ).write( '\n'.join( init.get(name,name) for name in oldnames ) )
+    os.fdopen(fd, 'w').write('\n'.join(init.get(name,name) for name in oldnames))
     while True:
-      if os.system( editor + ' ' + tmp ) != 0:
-        print( 'editor returned with non-zero status' )
-      with open( tmp, 'r' ) as fid:
+      if os.system(editor + ' ' + tmp) != 0:
+        print('editor returned with non-zero status')
+      with open(tmp, 'r') as fid:
         newnames = fid.read().splitlines()
-      for i, (old,new) in enumerate( itertools.zip_longest( oldnames, newnames, fillvalue='?' ) ):
+      for i, (old,new) in enumerate(itertools.zip_longest(oldnames, newnames, fillvalue='?')):
         if old != new:
-          print( 'line {}: {} -> {}'.format( i+1, old, new ) )
+          print('line {}: {} -> {}'.format(i+1, old, new))
       if len(newnames) != len(oldnames):
-        print( 'error: invalid length' )
+        print('error: invalid length')
       elif len(set(newnames)) < len(newnames):
-        print( 'error: duplicate names' )
+        print('error: duplicate names')
       elif not all(newnames):
-        print( 'error: empty filenames' )
-      elif oldnames == newnames or proceed( 'yes', 'no' ) == 0:
-        return { old: new for old, new in zip( oldnames, newnames ) if old != new }
-      if proceed( 'edit', 'quit' ) == 1:
-        sys.exit( 'aborted.' )
+        print('error: empty filenames')
+      elif oldnames == newnames or proceed('yes', 'no') == 0:
+        return {old: new for old, new in zip(oldnames, newnames) if old != new}
+      assert proceed('edit', 'quit') == 0, 'aborted.'
   finally:
-    os.remove( tmp )
+    os.remove(tmp)
 
 
-def poprename( renames ):
+def poprename(renames):
   '''Pop a dictionary item and perform the rename operation.
 
   The first rename operation is performed that has a free destination path. If
   renames occur in a "a->b->..->a" cycle then a temporary path is introduced
   and added to the dictionary of renames. The rename item is popped only after
   the move operation is succesfully completed to ensure that the dictionary
-  remains in sync with the on-disk state at all times.
-  '''
+  remains in sync with the on-disk state at all times. Returns True in case of
+  a successful move, or False otherwise.'''
 
+  # get random starting point
   for name in renames:
     break
+
+  # follow rename chain to find either a free target or a closed loop
+  cycle = [name]
+  while renames[name] in renames and renames[name] != cycle[0]:
+    name = renames[name]
+    cycle.append(name)
+
+  # modify target in case of closed loop
+  target = renames[name]
+  if target == cycle[0]:
+    print('cycle detected:', ' '.join(cycle))
+    while os.path.exists(target):
+      target += '_'
+  elif os.path.exists(target):
+    print('cannot rename {} to {}: target exists'.format(name,target))
+    return False
+
+  # perform rename and update dictionary
   try:
-    cycle = [name]
-    while os.path.exists( renames[name] ):
-      name = renames[name]
-      assert name in renames, 'target exists'
-      if name != cycle[0]:
-        cycle.append( name )
-      else:
-        print( 'cycle detected:', ' '.join(cycle) )
-        temp = name
-        while os.path.exists(temp):
-          temp += '_'
-        renames.update({ name: temp, temp: renames[name] })
-    os.renames( name, renames[name] )
+    os.renames(name, target)
   except Exception as e:
-    raise Exception( 'failed to rename {} to {}: {}'.format( name, renames.get(name,'???'), e ) )
+    print('failed to rename {} to {}: {}'.format(name,target,e))
+    return False
   else:
-    print( 'renamed', name, 'to', renames.pop(name) )
+    print('renamed {} to {}'.format(name, target))
+    if target != renames[name]: # closed loop
+      renames[target] = renames[name]
+    del renames[name]
+    return True
 
 
-def main():
+def cli():
   '''Coordinate aqcuisition and execution of renames.
 
   Call getrenames to obtain text editor input and feed the resuling renames
   dictionary into poprename until empty. In case of errors, repeat the above,
   while feeding the leftover renames back into getrenames to ensure that edits
-  are not lost.
-  '''
+  are not lost.'''
 
   if len(sys.argv) != 1:
-    sys.exit( 'usage: {}'.format(sys.argv[0]) )
-  renames = getrenames()
-  while renames:
-    try:
-      poprename( renames )
-    except Exception as e:
-      print( 'error:', e )
-      if proceed( 'edit', 'quit' ) == 1:
-        sys.exit( 'aborted.' )
-      renames = getrenames( init=renames )
-  print( 'nothing left to rename.' )
+    print('usage: {}'.format(sys.argv[0]))
+    return 2
+  try:
+    renames = getrenames()
+    while renames:
+      if not poprename(renames):
+        assert proceed('edit', 'quit') == 0, 'aborted.'
+        renames = getrenames(init=renames)
+  except Exception as e:
+    print('error:', e)
+    return 1
+  else:
+    print('nothing left to rename.')
+    return 0
 
 
 if __name__ == '__main__':
-  main()
+  sys.exit(cli())

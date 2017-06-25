@@ -77,7 +77,7 @@ absolute) destination path including directory separators.
 ## installation
 
 Mvi does not have any dependencies other than Python3 and can be run directly
-as `python3 mvi.py`. Alternatively it can be installed system wide using
+from the repository. Alternatively it can be installed system wide using
 Python's setuptools:
 
     python3 setup.py install

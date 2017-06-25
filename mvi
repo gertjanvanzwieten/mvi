@@ -1,0 +1,13 @@
+#! /usr/bin/env python3
+
+import mvi, sys
+
+if len(sys.argv) != 1:
+  sys.exit('usage: mvi')
+
+try:
+  mvi.rename()
+except Exception as e:
+  sys.exit('error: {}'.format(e))
+
+print('nothing left to rename.')

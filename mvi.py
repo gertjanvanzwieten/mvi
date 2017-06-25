@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import os, sys, tempfile, itertools
+import os, tempfile, itertools
 
 
 def proceed(*options):
@@ -95,7 +95,7 @@ def poprename(renames):
     return True
 
 
-def cli():
+def rename():
   '''Coordinate aqcuisition and execution of renames.
 
   Call getrenames to obtain text editor input and feed the resuling renames
@@ -103,22 +103,8 @@ def cli():
   while feeding the leftover renames back into getrenames to ensure that edits
   are not lost.'''
 
-  if len(sys.argv) != 1:
-    print('usage: {}'.format(sys.argv[0]))
-    return 2
-  try:
-    renames = getrenames()
-    while renames:
-      if not poprename(renames):
-        assert proceed('edit', 'quit') == 0, 'aborted.'
-        renames = getrenames(init=renames)
-  except Exception as e:
-    print('error:', e)
-    return 1
-  else:
-    print('nothing left to rename.')
-    return 0
-
-
-if __name__ == '__main__':
-  sys.exit(cli())
+  renames = getrenames()
+  while renames:
+    if not poprename(renames):
+      assert proceed('edit', 'quit') == 0, 'aborted.'
+      renames = getrenames(init=renames)

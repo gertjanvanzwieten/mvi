@@ -2,6 +2,8 @@
 
 import os, tempfile, itertools
 
+__version__ = '1.0'
+
 
 def proceed(*options):
   '''Wait for keyboard input to select option, return index.

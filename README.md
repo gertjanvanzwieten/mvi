@@ -15,12 +15,12 @@ a common naming structure. It also requires fluidity in Perl's regular
 expression syntax to be useful, which sets a very high bar for entry.
 
 Mvi (which can be seen to be either a contraction of "mv vi" or a more general
-abbreviation of "move interactively", per preference) aims to simplify bulk
-renames of files and directories by opening the current directory listing in a
-text editor, thus providing a powerful interface for editing destination paths.
-Names can be changed by editing the lines in place while preserving order. Upon
-save and exit mvi will show a list of scheduled rename operations and ask for
-confirmation.
+abbreviation of "move interactively") aims to simplify bulk renames of files
+and directories by opening the directory listing in a text editor, thus
+providing a powerful interface for editing destination paths. Names can be
+changed by editing the lines in place while preserving order. Upon save and
+exit mvi will show a list of scheduled rename operations and ask for
+confirmation before performing the changes on disk.
 
 ## examples
 
@@ -85,3 +85,8 @@ Python's setuptools:
 Or in ~/.local/bin:
 
     python3 setup.py install --user
+
+Mvi is also available on [pypi](https://pypi.org/project/mvi/) for installation
+via pip:
+
+    pip3 install mvi

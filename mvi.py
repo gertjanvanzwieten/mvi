@@ -62,6 +62,7 @@ def poprename(renames):
   a successful move, or False otherwise.'''
 
   # get random starting point
+  assert renames, 'nothing to rename'
   for name in renames:
     break
 
@@ -77,22 +78,18 @@ def poprename(renames):
     print('cycle detected:', ' '.join(cycle))
     while os.path.exists(target):
       target += '_'
-  elif os.path.exists(target):
-    print('cannot rename {} to {}: target exists'.format(name,target))
-    return False
 
-  # perform rename and update dictionary
-  try:
-    os.renames(name, target)
-  except Exception as e:
-    print('failed to rename {} to {}: {}'.format(name,target,e))
-    return False
-  else:
-    print('renamed {} to {}'.format(name, target))
-    if target != renames[name]: # closed loop
-      renames[target] = renames[name]
-    del renames[name]
-    return True
+  # check that target is free
+  assert not os.path.exists(target), 'cannot rename {} to {}: target exists'.format(name,target)
+
+  # perform rename
+  os.renames(name, target)
+
+  # update dictionary
+  print('renamed {} to {}'.format(name, target))
+  if target != renames[name]: # closed loop
+    renames[target] = renames[name]
+  del renames[name]
 
 
 def rename():
@@ -105,6 +102,9 @@ def rename():
 
   renames = getrenames()
   while renames:
-    if not poprename(renames):
+    try:
+      poprename(renames)
+    except Exception as e:
+      print(e)
       assert proceed('edit', 'quit') == 0, 'aborted.'
       renames = getrenames(init=renames)

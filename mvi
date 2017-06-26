@@ -1,9 +1,13 @@
 #! /usr/bin/env python3
 
-import mvi, sys
+import mvi, os, sys
 
 if len(sys.argv) != 1:
-  sys.exit('usage: mvi')
+  try:
+    assert len(sys.argv) == 2, 'multiple arguments'
+    os.chdir(sys.argv[1])
+  except Exception as e:
+    sys.exit('usage: mvi [path]\nerror: {}'.format(e))
 
 try:
   mvi.rename()

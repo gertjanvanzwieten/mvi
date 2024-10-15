@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
-import mvi, setuptools
+import mvi
+import setuptools
 
 description = 'Move files by text edit'
 
@@ -27,16 +28,16 @@ exit mvi will show a list of scheduled rename operations and ask for
 confirmation before performing the changes on disk.'''
 
 setuptools.setup(
-  name='mvi',
-  version=mvi.__version__,
-  description=description,
-  long_description=long_description,
-  url='https://github.com/gertjanvanzwieten/mvi',
-  author='Gertjan van Zwieten',
-  author_email = 'git@gjvz.nl',
-  license='MIT',
-  install_requires=[],
-  python_requires='>=3',
-  py_modules=['mvi'],
-  scripts=['mvi'],
+    name='mvi',
+    version=mvi.__version__,
+    description=description,
+    long_description=long_description,
+    url='https://github.com/gertjanvanzwieten/mvi',
+    author='Gertjan van Zwieten',
+    author_email='git@gjvz.nl',
+    license='MIT',
+    install_requires=[],
+    python_requires='>=3',
+    py_modules=['mvi'],
+    scripts=['mvi'],
 )

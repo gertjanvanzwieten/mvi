@@ -1,10 +1,11 @@
-#! /usr/bin/env python3
+'''Move Interactively'''
 
 import os
+import sys
 import tempfile
 import itertools
 
-__version__ = '1.0'
+__version__ = '1.0.1'
 
 
 def proceed(*options):
@@ -112,3 +113,14 @@ def rename():
             print(e)
             assert proceed('edit', 'quit') == 0, 'aborted.'
             renames = getrenames(init=renames)
+
+
+def main():
+    if len(sys.argv) != 1:
+        try:
+            assert len(sys.argv) == 2, 'multiple arguments'
+            os.chdir(sys.argv[1])
+        except Exception as e:
+            sys.exit('usage: mvi [path]\nerror: {}'.format(e))
+    rename()
+    print('nothing left to rename.')

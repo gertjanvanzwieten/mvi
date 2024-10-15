@@ -76,17 +76,11 @@ absolute) destination path including directory separators.
 
 ## installation
 
-Mvi does not have any dependencies other than Python3 and can be run directly
-from the repository. Alternatively it can be installed system wide using
-Python's setuptools:
+Mvi is available on [pypi](https://pypi.org/project/mvi/) for installation via
+pip:
 
-    python3 setup.py install
+    $ pip3 install mvi
 
-Or in ~/.local/bin:
-
-    python3 setup.py install --user
-
-Mvi is also available on [pypi](https://pypi.org/project/mvi/) for installation
-via pip:
-
-    pip3 install mvi
+Note that in externally managed environments (i.e. having Python packages
+installed via apt or similar) you may need to add `--break-system-packages` to
+step over pip's guard rails.

@@ -3,124 +3,166 @@
 import os
 import sys
 import tempfile
-import itertools
 
-__version__ = '1.0.1'
+__version__ = '2.0'
 
 
-def proceed(*options):
-    '''Wait for keyboard input to select option, return index.
+def display_and_verify(sources, destinations):
+    '''Print and verify rename operations.
 
-    Options can be specifide by either the first character or the full word. No
-    checks are performed to confirm that all options have a uniquely identifying
-    first character.'''
+    Given a list of source paths and a list of destination paths, print an
+    overview of the rename operations and verify that the input is valid. If
+    the input is not valid, for instance because the lists are of different
+    length or a destination exists, raise a ValueError with an appropriate
+    message detailing the issue.'''
+
+    for i, (source, destination) in enumerate(zip(sources, destinations), start=1):
+        if source != destination:
+            print(f'Line {i}: {source} -> {destination}')
+
+    if len(destinations) < len(sources):
+        for i, source in enumerate(sources[len(destinations):], start=1+len(destinations)):
+            print(f'Line {i}: {source} -> ?')
+        raise ValueError('list of destination names is too short')
+
+    if len(destinations) > len(sources):
+        for i, destination in enumerate(destinations[len(sources):], start=1+len(sources)):
+            print(f'Line {i}: ? -> {destination}')
+        raise ValueError('list of destination names is too long')
+
+    if not all(destinations):
+        raise ValueError('filenames must be at least one character long')
+
+    seen = {}
+    for source, destination in zip(sources, destinations):
+        if destination in seen:
+            raise ValueError(f'both {seen[destination]} and {source} want to move to {destination}')
+        seen[destination] = source
+
+    renames = {source: destination for source, destination in zip(sources, destinations) if source != destination}
+    for destination in renames.values():
+        if destination not in renames and os.path.exists(destination):
+            raise ValueError(f'destination exists: {destination}')
+
+
+def move(source, destination):
+    '''Rename file if destination is free and print feedback.
+
+    Aims to avoid that files get overwritten by raising a FileExistsError
+    if the destination path is occupied. Note that some platforms such as
+    Windows refuse to rename to an existing path, but others such as Linux
+    don't, so we add a check for caution and for consistency.'''
+
+    if os.path.exists(destination):
+        raise FileExistsError(destination)
+    os.renames(source, destination)
+    print(f'Moved {source} -> {destination}')
+
+
+def move_all(sources, destinations):
+    '''Perform all renames from the rename dictionary.
+
+    Items are popped off the dictionary in place after every succesful rename
+    operation, to allow remaining items to be recovered on error.'''
+
+    assert len(sources) == len(destinations) and isinstance(sources, list)
+
+    queue = list(range(len(sources)))
+    cycle = None
+    for i in queue:
+        source = sources[i]
+        destination = destinations[i]
+        if source == destination:
+            pass
+        elif destination not in sources:
+            move(source, destination)
+            sources[i] = destination
+            cycle = None
+        else: # destination position is occupied
+            queue.append(i) # try again later
+            if cycle == i: # we already cycled back to this index without making any move
+                while sources[i] in destinations:
+                    sources[i] += '_'
+                move(source, sources[i]) # break cycle by moving to temporary location
+            elif cycle is None: # not presently waiting for another index to reappear
+                cycle = i # start tracking
+
+    assert sources == destinations
+
+
+# INTERACTVE ZONE
+
+
+def choose(*options):
+    '''Print a selection dialog and return the choice.'''
 
     while True:
-        answer = input('proceed {}? '.format('/'.join(options)))
-        for i, option in enumerate(options):
-            if answer in (option, option[0]):
-                return i
+        s = input(f'Proceed: {"/".join(options)} ')
+        choices = [option for option in options if option.startswith(s)]
+        if len(choices) == 1:
+            return choices[0]
 
 
-def getrenames(init={}):
-    '''Invoke editor to create a rename dictionary.
+def choose_or_abort(*options):
+    '''Print a selection dialog including 'abort' and return the choice.
 
-    A temporary file is created with the alphabetically ordered file and
-    directory listing of the current working directory, and opened with the
-    default system editor. At exit the list is checked for errors and returned as
-    an old->new dictionary limited to changes.'''
+    Raise a KeyboardInterrupt if abort is chosen. This allows for the same code
+    path to handle a menu abort and a Ctrl+C (Linux) or Ctrl+Z (Windows) input.'''
 
-    oldnames = sorted(os.listdir())
-    editor = os.environ.get('EDITOR', 'vim')
-    fd, tmp = tempfile.mkstemp()
-    try:
-        os.fdopen(fd, 'w').write('\n'.join(init.get(name, name) for name in oldnames))
-        while True:
-            if os.system(editor + ' ' + tmp) != 0:
-                print('editor returned with non-zero status')
-            with open(tmp, 'r') as fid:
-                newnames = fid.read().splitlines()
-            for i, (old, new) in enumerate(itertools.zip_longest(oldnames, newnames, fillvalue='?')):
-                if old != new:
-                    print('line {}: {} -> {}'.format(i+1, old, new))
-            if len(newnames) != len(oldnames):
-                print('error: invalid length')
-            elif len(set(newnames)) < len(newnames):
-                print('error: duplicate names')
-            elif not all(newnames):
-                print('error: empty filenames')
-            elif oldnames == newnames or proceed('yes', 'no') == 0:
-                return {old: new for old, new in zip(oldnames, newnames) if old != new}
-            assert proceed('edit', 'quit') == 0, 'aborted.'
-    finally:
-        os.remove(tmp)
-
-
-def poprename(renames):
-    '''Pop a dictionary item and perform the rename operation.
-
-    The first rename operation is performed that has a free destination path. If
-    renames occur in a "a->b->..->a" cycle then a temporary path is introduced
-    and added to the dictionary of renames. The rename item is popped only after
-    the move operation is succesfully completed to ensure that the dictionary
-    remains in sync with the on-disk state at all times. Returns True in case of
-    a successful move, or False otherwise.'''
-
-    # get random starting point
-    assert renames, 'nothing to rename'
-    for name in renames:
-        break
-
-    # follow rename chain to find either a free target or a closed loop
-    cycle = [name]
-    while renames[name] in renames and renames[name] != cycle[0]:
-        name = renames[name]
-        cycle.append(name)
-
-    # modify target in case of closed loop
-    target = renames[name]
-    if target == cycle[0]:
-        print('cycle detected:', ' '.join(cycle))
-        while os.path.exists(target):
-            target += '_'
-
-    # check that target is free
-    assert not os.path.exists(target), 'cannot rename {} to {}: target exists'.format(name, target)
-
-    # perform rename
-    os.renames(name, target)
-
-    # update dictionary
-    print('renamed {} to {}'.format(name, target))
-    if target != renames[name]:  # closed loop
-        renames[target] = renames[name]
-    del renames[name]
-
-
-def rename():
-    '''Coordinate aqcuisition and execution of renames.
-
-    Call getrenames to obtain text editor input and feed the resuling renames
-    dictionary into poprename until empty. In case of errors, repeat the above,
-    while feeding the leftover renames back into getrenames to ensure that edits
-    are not lost.'''
-
-    renames = getrenames()
-    while renames:
-        try:
-            poprename(renames)
-        except Exception as e:
-            print(e)
-            assert proceed('edit', 'quit') == 0, 'aborted.'
-            renames = getrenames(init=renames)
+    assert 'abort' not in options
+    choice = choose(*options, 'abort')
+    if choice == 'abort':
+        raise KeyboardInterrupt
+    return choice
 
 
 def main():
+    '''Create rename file and commit changes.
+
+    The rename file is opened in the system temp directory and maintained until
+    the last change is committed. The sources list with the corresponding
+    original paths is edited in place after every successful move.'''
+
     if len(sys.argv) != 1:
-        try:
-            assert len(sys.argv) == 2, 'multiple arguments'
-            os.chdir(sys.argv[1])
-        except Exception as e:
-            sys.exit('usage: mvi [path]\nerror: {}'.format(e))
-    rename()
-    print('nothing left to rename.')
+        sys.exit(f'mvi does not take any arguments')
+
+    editor = os.environ.get('EDITOR', 'vim')
+
+    sources = sorted(os.listdir())
+
+    fd, tmp = tempfile.mkstemp(prefix='mvi')
+    try:
+
+        with os.fdopen(fd, 'w') as f:
+            for source in sources:
+                print(source, file=f)
+
+        while True:
+
+            try:
+
+                if os.system(f'{editor} {tmp}') != 0:
+                    print('Warning: editor returned with non-zero status')
+                with open(tmp, 'r') as f:
+                    destinations = f.read().splitlines()
+                if destinations == sources:
+                    print('Nothing to move.')
+                else:
+                    display_and_verify(sources, destinations)
+                    if choose_or_abort('continue', 'edit') == 'edit':
+                        continue
+                    move_all(sources, destinations)
+                    print('Done.')
+                break
+
+            except Exception as e:
+                print('Error:', e)
+
+            choose_or_abort('edit')
+
+    except KeyboardInterrupt:
+        print('Aborted.')
+    except Exception as e:
+        print('Fatal error:', e)
+    finally:
+        os.remove(tmp)

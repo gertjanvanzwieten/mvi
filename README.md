@@ -1,26 +1,21 @@
-# mvi
-Move files by text edit
+# mvi: move interactively
 
-Organising large amounts of files via the command line is cumbersome. The
-standard UNIX `mv` command can rename a file or directory, or move items in
-bulk, but the two operations cannot be combined. Furthermore, editing
-capabilities on the command line offered by most shells are too limited to
-comfortably alter long file or directory names, or add characters from foreign
-character sets. Names containing spaces or other special characters should be
-quoted or escaped, adding yet another layer of annoyance.
+Organising files via the command line can be cumbersome, for many reasons.
+Editing capabilities on the command line are limited. Characters from foreign
+character sets cannot be inserted. Arguments may require quoting or escaping.
+Names may be mistaken for flags.
 
-Larry Wall's `rename` complements `mv` with the ability to rename in bulk, but
-being based on regular expressions it is suited mostly for file sets that share
-a common naming structure. It also requires fluidity in Perl's regular
-expression syntax to be useful, which sets a very high bar for entry.
-
-Mvi (which can be seen to be either a contraction of "mv vi" or a more general
-abbreviation of "move interactively") aims to simplify bulk renames of files
-and directories by opening the directory listing in a text editor, thus
-providing a powerful interface for editing destination paths. Names can be
-changed by editing the lines in place while preserving order. Upon save and
+Mvi aims to simplify bulk renames of files and directories by opening the
+directory listing in a text editor, thus providing a powerful interface for
+editing destination paths. Names are changed by editing lines in place. Upon
 exit mvi will show a list of scheduled rename operations and ask for
-confirmation before performing the changes on disk.
+confirmation before committing the changes to disk.
+
+A lot of care is taken to make sure that mvi does not bail out halfway through
+an operation. File targets are checked for availability before starting a
+commit - mvi will never overwrite a file. In case of an unexpected IO error mvi
+will return to the editor for manual resolution, from where it can pick up with
+the remaining move operations.
 
 ## examples
 
@@ -31,10 +26,10 @@ into "baz" (not shown, but listed by mvi in summary):
     bar foo
 
     $ mvi
-    line 1: bar -> baz
-    proceed yes/no? y
-    renamed bar to baz
-    nothing left to rename.
+    Line 1: bar -> baz
+    Proceed: continue/edit/abort c
+    Moved bar -> baz
+    Done.
 
     $ ls
     baz foo
@@ -45,14 +40,13 @@ Swapping lines results in swapping files:
     bar foo
 
     $ mvi
-    line 1: bar -> foo
-    line 2: foo -> bar
-    proceed yes/no? y
-    cycle detected: foo bar
-    renamed foo to bar_
-    renamed bar to foo
-    renamed bar_ to bar
-    nothing left to rename.
+    Line 1: bar -> foo
+    Line 2: foo -> bar
+    Proceed: continue/edit/abort c
+    Moved bar -> bar_
+    Moved foo -> bar
+    Moved bar_ -> foo
+    Done.
 
     $ ls
     bar foo
@@ -64,12 +58,12 @@ absolute) destination path including directory separators.
     bar foo
 
     $ mvi
-    line 1: bar -> sub/bar
-    line 2: foo -> sub/foo
-    proceed yes/no? y
-    renamed bar to sub/bar
-    renamed foo to sub/foo
-    nothing left to rename.
+    Line 1: bar -> sub/bar
+    Line 2: foo -> sub/foo
+    Proceed: continue/edit/abort c
+    Moved bar -> sub/bar
+    Moved foo -> sub/foo
+    Done.
 
     $ ls
     sub/
@@ -83,4 +77,13 @@ pip:
 
 Note that in externally managed environments (i.e. having Python packages
 installed via apt or similar) you may need to add `--break-system-packages` to
-step over pip's guard rails.
+step over pip's guard rails. Alternatively you can use
+[pipx](https://pypa.github.io/pipx/) to install mvi in an isolated environment:
+
+    $ pipx install mvi
+
+## see also
+
+The [rename](https://man7.org/linux/man-pages/man1/rename.1.html) command that
+is available in most distributions allows for bulk move operations based on
+regular expressions.
